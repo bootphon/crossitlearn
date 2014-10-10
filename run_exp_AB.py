@@ -143,12 +143,16 @@ def run(dataset_path=DEFAULT_DATASET, dataset_name='pascal1k',
     output_file_name += "_emb_" + str(DIM_EMBEDDING)
     print "output file name:", output_file_name
 
+    train_set_iterator = iterator_type(dataset_path + '/split_train_img.mat',
+            dataset_path + '/corpus.pkl', batch_size=batch_size)
+    valid_set_iterator = iterator_type(dataset_path + '/split_val_img.mat',
+            dataset_path + '/corpus.pkl', batch_size=batch_size)
+    test_set_iterator = iterator_type(dataset_path + '/split_test_img.mat',
+            dataset_path + '/corpus.pkl', batch_size=batch_size)
 
-    n_ins = None
-    n_outs = None
+    n_ins = (4096, 40*71)  # TODO un-hardcode
+    n_outs = DIM_EMBEDDING # TODO un-constant
     print "loading dataset from", dataset_path
-
-        
 
     assert n_ins != None
     assert n_outs != None
