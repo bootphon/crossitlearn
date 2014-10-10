@@ -20,7 +20,9 @@ TODO: scores && plots
 
 (On Mac OS X only)
 Use `bash say_words.sh` with a words.txt file in the same directory. Then you
-can `sox` the produced `*.aif` to `*.wav` files, then transform them to
-filterbanks with `python mfsc.py *.wav` and finally put them in one big `*.npz`
-formatted dictionary with `python npz_fbanks.py FOLDER`.
+can `sox` the produced `*.aif` to `*.wav` files (you may need to `for` loop),
+then transform them to filterbanks with `python mfsc.py *.wav` (`for` too) and
+finally put them in one big `*.npz` formatted dictionary with
+`python npz_fbanks.py FOLDER`.  
+Finally use `python simple_dnn.py` to train a DNN if wanted (look into it).
 

@@ -12,6 +12,7 @@ from theano.tensor.shared_randomstreams import RandomStreams
 from collections import OrderedDict
 
 BATCH_SIZE = 100
+STACKSIZE = 69
 
 def relu_f(vec):
     """ Wrapper to quickly change the rectified linear unit function """
@@ -599,7 +600,7 @@ if __name__ == "__main__":
     PLOT = True
 
     def train_models(x_train, y_train, x_test, y_test, n_features, n_outs,
-            use_dropout=True, n_epochs=100, numpy_rng=None, # TODO 200+ epochs
+            use_dropout=False, n_epochs=100, numpy_rng=None, # TODO 200+ epochs
             svms=False, nb=False, deepnn=True, name=''):
         if svms:
             print("Linear SVM")
@@ -635,8 +636,7 @@ if __name__ == "__main__":
                     return DropoutNet(numpy_rng=numpy_rng, n_ins=n_features,
                         #layers_types=[ReLU, ReLU, ReLU, ReLU, LogisticRegression],
                         layers_types=[SoftPlus, SoftPlus, SoftPlus, SoftPlus, LogisticRegression],
-                        #layers_sizes=[2000, 2000, 2000, 2000],
-                        layers_sizes=[200, 200, 200, 200],
+                        layers_sizes=[2000, 2000, 2000, 2000],
                         dropout_rates=[0.2, 0.5, 0.5, 0.5, 0.5],
                         n_outs=n_outs,
                         max_norm=4.,
@@ -647,11 +647,11 @@ if __name__ == "__main__":
                     return RegularizedNet(numpy_rng=numpy_rng, n_ins=n_features,
                         #layers_types=[LogisticRegression],
                         #layers_sizes=[],
-                        layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
+                        #layers_types=[ReLU, ReLU, ReLU, LogisticRegression],
                         #layers_types=[SoftPlus, SoftPlus, SoftPlus, LogisticRegression],
-                        layers_sizes=[1000, 1000, 1000],
-                        #layers_types=[ReLU, LogisticRegression],
-                        #layers_sizes=[200],
+                        #layers_sizes=[1000, 1000, 1000],
+                        layers_types=[ReLU, LogisticRegression],
+                        layers_sizes=[200],
                         n_outs=n_outs,
                         #L1_reg=0.001/x_train.shape[0],
                         #L2_reg=0.001/x_train.shape[0],
@@ -785,14 +785,38 @@ if __name__ == "__main__":
         #>>> shapes.min(axis=0)
         #array([39, 40])
         words_fbanks = numpy.load("all_words_pascal1k.npz")
-        n_words = len(words_fbanks.keys())
+        n_tokens = len([k for k in words_fbanks.keys()])
+        lexicon = set([w.split('_')[1] for w in words_fbanks.keys()])
+        lexicon = [w for w in lexicon]  # we need an ordered collection
+        n_words = len(lexicon)
         all_fbanks = numpy.concatenate([v for _, v in words_fbanks.iteritems()])
         print all_fbanks.shape
         mean = all_fbanks.mean(axis=0)
         print mean.shape
         std = all_fbanks.std(axis=0)
         print std.shape
-        X = numpy.zeros((n_words, 40*70), dtype='float32')
-        y = 
-        # take 70 fbanks in the middle of the word and pad with 0s if needed
+        # take 69 fbanks in the middle of the word and pad with 0s if needed
+        X = numpy.zeros((n_tokens, 40*STACKSIZE), dtype='float32')
+        y = numpy.zeros(n_tokens, dtype='int32')
+        for i, (swf, fb) in enumerate(words_fbanks.iteritems()):
+            spkr, word, _ = swf.split('_')
+            l = fb.shape[0]
+            m = l/2
+            s = max(0, m - ((STACKSIZE-1) / 2))
+            e = min(l-1, m + ((STACKSIZE-1) / 2))
+            tmp = (fb - mean) / std
+            tmp = tmp[s:e+1].flatten()
+            diff = 40*STACKSIZE - tmp.shape[0]
+            if not diff:
+                X[i] = tmp
+            else:
+                X[i][diff/2:-diff/2] = tmp
+            y[i] = lexicon.index(word)
+        # train the DNN, with the training set as test set if let in this form:
+        train_models(X, y, X, y, X.shape[1],
+                     len(set(y)),
+                     numpy_rng=numpy.random.RandomState(123),
+                     svms=False, nb=False, deepnn=True,
+                     name='spoken_words')
+
 
