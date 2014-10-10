@@ -12,7 +12,6 @@ from theano.tensor.shared_randomstreams import RandomStreams
 from collections import OrderedDict
 
 BATCH_SIZE = 100
-SAG = False
 
 def relu_f(vec):
     """ Wrapper to quickly change the rectified linear unit function """
@@ -20,7 +19,7 @@ def relu_f(vec):
 
 
 def softplus_f(v):
-    return T.log(1 + T.exp(v))
+    return T.nnet.softplus(v)
 
 
 def dropout(rng, x, p=0.5):
@@ -195,7 +194,6 @@ class NeuralNet(object):
         """
         self.layers = []
         self.params = []
-        self.pre_activations = [] # SAG specific
         self.n_layers = len(layers_types)
         self.layers_types = layers_types
         assert self.n_layers > 0
@@ -205,8 +203,6 @@ class NeuralNet(object):
         self._accugrads = []  # for adadelta
         self._accudeltas = []  # for adadelta
         self._old_dxs = []  # for adadelta with Nesterov
-        if SAG:
-            self._sag_gradient_memory = []  # for SAG
 
         if theano_rng == None:
             theano_rng = RandomStreams(numpy_rng.randint(2 ** 30))
@@ -225,17 +221,12 @@ class NeuralNet(object):
                     input=layer_input, n_in=n_in, n_out=n_out)
             assert hasattr(this_layer, 'output')
             self.params.extend(this_layer.params)
-            #self.pre_activations.extend(this_layer.pre_activation)# SAG specific TODO 
             self._accugrads.extend([build_shared_zeros(t.shape.eval(),
                 'accugrad') for t in this_layer.params])
             self._accudeltas.extend([build_shared_zeros(t.shape.eval(),
                 'accudelta') for t in this_layer.params])
             self._old_dxs.extend([build_shared_zeros(t.shape.eval(),
                 'old_dxs') for t in this_layer.params])
-
-            if SAG:
-                self._sag_gradient_memory.extend([build_shared_zeros(tuple([(x_train.shape[0]+BATCH_SIZE-1) / BATCH_SIZE] + list(t.shape.eval())), 'sag_gradient_memory') for t in this_layer.params])
-                #self._sag_gradient_memory.extend([[build_shared_zeros(t.shape.eval(), 'sag_gradient_memory') for _ in xrange(x_train.shape[0] / BATCH_SIZE + 1)] for t in this_layer.params])
 
             self.layers.append(this_layer)
             layer_input = this_layer.output
@@ -289,40 +280,6 @@ class NeuralNet(object):
 
         return train_fn
 
-    def get_SAG_trainer(self, R=1., alpha=0., debug=False):  # alpha for reg. TODO
-        batch_x = T.fmatrix('batch_x')
-        batch_y = T.ivector('batch_y')
-        ind_minibatch = T.iscalar('ind_minibatch')
-        n_seen = T.fscalar('n_seen')
-        # compute the gradients with respect to the model parameters
-        cost = self.mean_cost
-        gparams = T.grad(cost, self.params)
-        #sparams = T.grad(cost, self.pre_activations)  # SAG specific
-
-        scaling = numpy.float32(1. / (R / 4. + alpha))
-
-        updates = OrderedDict()
-        for accugrad, gradient_memory, param, gparam in zip(
-                self._accugrads, self._sag_gradient_memory,
-                #self._accugrads, self._sag_gradient_memory[ind_minibatch.eval()],
-                self.params, gparams):
-            new = gparam + alpha * param
-            agrad = accugrad + new - gradient_memory[ind_minibatch]
-            # updates[gradient_memory[ind_minibatch]] = new
-            updates[gradient_memory] = T.set_subtensor(gradient_memory[ind_minibatch], new)
-
-            updates[param] = param - (scaling / n_seen) * agrad
-            updates[accugrad] = agrad
-
-        train_fn = theano.function(inputs=[theano.Param(batch_x), 
-            theano.Param(batch_y), theano.Param(ind_minibatch),
-            theano.Param(n_seen)],
-            outputs=cost,
-            updates=updates,
-            givens={self.x: batch_x, self.y: batch_y})
-
-        return train_fn
-
     def get_adagrad_trainer(self):
         """ Returns an Adagrad (Duchi et al. 2010) trainer using a learning rate.
         """
@@ -345,40 +302,6 @@ class NeuralNet(object):
                 updates[param] = W * (desired_norms / (1e-6 + col_norms))
             else:
                 updates[param] = param + dx
-            updates[accugrad] = agrad
-
-        train_fn = theano.function(inputs=[theano.Param(batch_x), 
-            theano.Param(batch_y),
-            theano.Param(learning_rate)],
-            outputs=self.mean_cost,
-            updates=updates,
-            givens={self.x: batch_x, self.y: batch_y})
-
-        return train_fn
-
-    def get_adagrad_nesterov_trainer(self):
-        """ Returns an Adagrad (Duchi et al. 2010) trainer using a learning rate.
-        """
-        beta = 0.5
-        batch_x = T.fmatrix('batch_x')
-        batch_y = T.ivector('batch_y')
-        learning_rate = T.fscalar('lr')  # learning rate to use
-        # compute the gradients with respect to the model parameters
-        gparams = T.grad(self.mean_cost, self.params)
-
-        # compute list of weights updates
-        updates = OrderedDict()
-        for accugrad, param, gparam, old_dx in zip(self._accugrads, self.params, gparams, self._old_dxs):
-            # c.f. Algorithm 1 in the Adadelta paper (Zeiler 2012)
-            agrad = accugrad + gparam * gparam
-            dx = - (learning_rate / T.sqrt(agrad + self._eps)) * gparam
-            if self.max_norm:
-                W = param + dx - beta*old_dx
-                col_norms = W.norm(2, axis=0)
-                desired_norms = T.clip(col_norms, 0, self.max_norm)
-                updates[param] = W * (desired_norms / (1e-6 + col_norms))
-            else:
-                updates[param] = param + dx - beta*old_dx
             updates[accugrad] = agrad
 
         train_fn = theano.function(inputs=[theano.Param(batch_x), 
@@ -426,131 +349,6 @@ class NeuralNet(object):
 
         return train_fn
 
-#    def get_adadelta_nesterov_trainer(self):
-#        """ Returns an Adadelta (Zeiler 2012) trainer using self._rho and
-#        self._eps params.
-#        """
-#        batch_x = T.fmatrix('batch_x')
-#        batch_y = T.ivector('batch_y')
-#        # compute the gradients with respect to the model parameters
-#        #beta = 0.95
-#        beta = 1.
-#        gparams = T.grad(self.mean_cost, self.params)
-#
-#        # compute list of weights updates
-#        updates = OrderedDict()
-#        for accugrad, accudelta, old_dx, param, gparam in zip(self._accugrads,
-#                self._accudeltas, self._old_dxs, self.params, gparams):
-#            # c.f. Algorithm 1 in the Adadelta paper (Zeiler 2012)
-#            agrad = self._rho * accugrad + (1 - self._rho) * gparam * gparam
-#            dx = - T.sqrt((accudelta + self._eps)
-#                          / (agrad + self._eps)) * gparam
-#            updates[accudelta] = (self._rho * accudelta
-#                                  + (1 - self._rho) * dx * dx)
-#            if self.max_norm:
-#                W = param + dx + beta*(dx-old_dx)
-#                col_norms = W.norm(2, axis=0)
-#                desired_norms = T.clip(col_norms, 0, self.max_norm)
-#                updates[param] = W * (desired_norms / (1e-6 + col_norms))
-#            else:
-#                updates[param] = param + dx + beta*(dx-old_dx)
-#            updates[old_dx] = dx
-#            updates[accugrad] = agrad
-#
-#        train_fn = theano.function(inputs=[theano.Param(batch_x),
-#                                           theano.Param(batch_y)],
-#                                   outputs=self.mean_cost,
-#                                   updates=updates,
-#                                   givens={self.x: batch_x, self.y: batch_y})
-#
-#        return train_fn
-
-    def nesterov_step(self):
-        beta = 0.5
-        updates = OrderedDict()
-        for param, dx in zip(self.params, self._old_dxs):
-            updates[param] = param + beta * dx
-        nesterov_fn = theano.function(inputs=[],
-                outputs=[],
-                updates=updates,
-                givens={})
-        nesterov_fn()
-
-    def get_adadelta_nesterov_trainer(self):
-        """ Returns an Adadelta (Zeiler 2012) trainer using self._rho and
-        self._eps params.
-        """
-        batch_x = T.fmatrix('batch_x')
-        batch_y = T.ivector('batch_y')
-        # compute the gradients with respect to the model parameters
-        gparams = T.grad(self.mean_cost, self.params)
-        beta = 0.5
-
-        # compute list of weights updates
-        updates = OrderedDict()
-        for accugrad, accudelta, old_dx, param, gparam in zip(self._accugrads,
-                self._accudeltas, self._old_dxs, self.params, gparams):
-            # c.f. Algorithm 1 in the Adadelta paper (Zeiler 2012)
-            agrad = self._rho * accugrad + (1 - self._rho) * gparam * gparam
-            dx = - T.sqrt((accudelta + self._eps)
-                          / (agrad + self._eps)) * gparam
-            updates[accudelta] = (self._rho * accudelta
-                                  + (1 - self._rho) * dx * dx)
-            if self.max_norm:
-                W = param + dx - beta*old_dx
-                #W = param + dx
-                col_norms = W.norm(2, axis=0)
-                desired_norms = T.clip(col_norms, 0, self.max_norm)
-                updates[param] = W * (desired_norms / (1e-6 + col_norms))
-            else:
-                updates[param] = param + dx - beta*old_dx
-                #updates[param] = param + dx
-            updates[old_dx] = dx
-            updates[accugrad] = agrad
-
-        train_fn = theano.function(inputs=[theano.Param(batch_x),
-                                           theano.Param(batch_y)],
-                                   outputs=self.mean_cost,
-                                   updates=updates,
-                                   givens={self.x: batch_x, self.y: batch_y})
-
-        return train_fn
-
-    def get_adadelta_rprop_trainer(self):
-        """ TODO
-        """
-        # TODO working on that
-        batch_x = T.fmatrix('batch_x')
-        batch_y = T.ivector('batch_y')
-        # compute the gradients with respect to the model parameters
-        gparams = T.grad(self.mean_cost, self.params)
-
-        # compute list of weights updates
-        updates = OrderedDict()
-        for accugrad, accudelta, param, gparam in zip(self._accugrads,
-                self._accudeltas, self.params, gparams):
-            # c.f. Algorithm 1 in the Adadelta paper (Zeiler 2012)
-            agrad = self._rho * accugrad + (1 - self._rho) * gparam * gparam
-            dx = - T.sqrt((accudelta + self._eps)
-                          / (agrad + self._eps)) * T.switch(gparam < 0, -1., 1.)
-            updates[accudelta] = (self._rho * accudelta
-                                  + (1 - self._rho) * dx * dx)
-            if self.max_norm:
-                W = param + dx
-                col_norms = W.norm(2, axis=0)
-                desired_norms = T.clip(col_norms, 0, self.max_norm)
-                updates[param] = W * (desired_norms / (1e-6 + col_norms))
-            else:
-                updates[param] = param + dx
-            updates[accugrad] = agrad
-
-        train_fn = theano.function(inputs=[theano.Param(batch_x),
-                                           theano.Param(batch_y)],
-                                   outputs=self.mean_cost,
-                                   updates=updates,
-                                   givens={self.x: batch_x, self.y: batch_y})
-
-        return train_fn
 
     def score_classif(self, given_set):
         """ Returns functions to get current classification errors. """
@@ -687,28 +485,11 @@ def add_fit_and_score(class_to_chg):
             train_fn = self.get_SGD_trainer()
         elif method == 'adagrad':
             train_fn = self.get_adagrad_trainer()
-        elif method == 'adagrad_nesterov':
-            train_fn = self.get_adagrad_nesterov_trainer()
         elif method == 'adadelta':
             train_fn = self.get_adadelta_trainer()
-        elif method == 'adadelta_nesterov':
-            train_fn = self.get_adadelta_nesterov_trainer()
         elif method == 'adadelta_rprop':
             train_fn = self.get_adadelta_rprop_trainer()
-        elif method == 'sag':
-            #train_fn = self.get_SAG_trainer(R=1+numpy.max(numpy.sum(x_train**2, axis=1)))
-            if BATCH_SIZE > 1:
-                line_sums = numpy.sum(x_train**2, axis=1)
-                train_fn = self.get_SAG_trainer(R=numpy.max(numpy.mean(
-                    line_sums[:(line_sums.shape[0]/BATCH_SIZE)*BATCH_SIZE].reshape((line_sums.shape[0]/BATCH_SIZE,
-                        BATCH_SIZE)), axis=1)),
-                    alpha=1./x_train.shape[0])
-            else:
-                train_fn = self.get_SAG_trainer(R=numpy.max(numpy.sum(x_train**2,
-                    axis=1)), alpha=1./x_train.shape[0])
         train_set_iterator = DatasetMiniBatchIterator(x_train, y_train)
-        if method == 'sag':
-            sag_train_set_iterator = DatasetMiniBatchIterator(x_train, y_train, randomize=True)
         dev_set_iterator = DatasetMiniBatchIterator(x_dev, y_dev)
         train_scoref = self.score_classif(train_set_iterator)
         dev_scoref = self.score_classif(dev_set_iterator)
@@ -722,37 +503,21 @@ def add_fit_and_score(class_to_chg):
             self._dev_errors = []
             self._updates = []
 
-        seen = numpy.zeros(((x_train.shape[0]+BATCH_SIZE-1) / BATCH_SIZE,), dtype=numpy.bool)
-        n_seen = 0
-
         while epoch < max_epochs:
             if not verbose:
                 sys.stdout.write("\r%0.2f%%" % (epoch * 100./ max_epochs))
                 sys.stdout.flush()
             avg_costs = []
             timer = time.time()
-            if method == 'sag':
-                for ind_minibatch, x, y in sag_train_set_iterator:
-                    if not seen[ind_minibatch]:
-                        seen[ind_minibatch] = 1
-                        n_seen += 1
-                    if 'nesterov' in method:
-                        self.nesterov_step()
-                    avg_cost = train_fn(x, y, ind_minibatch, n_seen)
-                    if type(avg_cost) == list:
-                        avg_costs.append(avg_cost[0])
-                    else:
-                        avg_costs.append(avg_cost)
-            else:
-                for x, y in train_set_iterator:
-                    if method == 'sgd' or 'adagrad' in method:
-                        avg_cost = train_fn(x, y, lr=1.E-2)
-                    elif 'adadelta' in method:
-                        avg_cost = train_fn(x, y)
-                    if type(avg_cost) == list:
-                        avg_costs.append(avg_cost[0])
-                    else:
-                        avg_costs.append(avg_cost)
+            for x, y in train_set_iterator:
+                if method == 'sgd' or 'adagrad' in method:
+                    avg_cost = train_fn(x, y, lr=1.E-2)
+                elif 'adadelta' in method:
+                    avg_cost = train_fn(x, y)
+                if type(avg_cost) == list:
+                    avg_costs.append(avg_cost[0])
+                else:
+                    avg_costs.append(avg_cost)
             if verbose:
                 mean_costs = numpy.mean(avg_costs)
                 mean_train_errors = numpy.mean(train_scoref())
@@ -823,7 +588,8 @@ if __name__ == "__main__":
 
     from sklearn import datasets, svm, naive_bayes
     from sklearn import cross_validation, preprocessing
-    MNIST = True
+    SPOKEN_WORDS = True
+    MNIST = False
     DIGITS = False
     NUDGE_DIGITS = True
     FACES = False
@@ -869,7 +635,8 @@ if __name__ == "__main__":
                     return DropoutNet(numpy_rng=numpy_rng, n_ins=n_features,
                         #layers_types=[ReLU, ReLU, ReLU, ReLU, LogisticRegression],
                         layers_types=[SoftPlus, SoftPlus, SoftPlus, SoftPlus, LogisticRegression],
-                        layers_sizes=[2000, 2000, 2000, 2000],
+                        #layers_sizes=[2000, 2000, 2000, 2000],
+                        layers_sizes=[200, 200, 200, 200],
                         dropout_rates=[0.2, 0.5, 0.5, 0.5, 0.5],
                         n_outs=n_outs,
                         max_norm=4.,
@@ -899,15 +666,7 @@ if __name__ == "__main__":
             ax2 = plt.subplot(222)
             ax3 = plt.subplot(223)
             ax4 = plt.subplot(224)  # TODO updates of the weights
-            #methods = ['adadelta', 'adadelta_nesterov', 'sgd', 'adagrad'] # 'sag'
-            #methods = ['adadelta_rprop', 'adadelta', 'adadelta_nesterov']
-            #methods = ['adadelta_nesterov', 'adadelta']
-            #methods = ['adagrad_nesterov', 'adagrad']
             methods = ['adadelta']
-            #methods = ['sgd']
-            #methods = ['adagrad']
-            if SAG:
-                methods = ['sag', 'sgd', 'adagrad', 'adadelta']
             for method in methods:
                 dnn = new_dnn(use_dropout)
                 print dnn
@@ -1008,4 +767,32 @@ if __name__ == "__main__":
                      numpy_rng=numpy.random.RandomState(123),
                      svms=False, nb=True, deepnn=True,
                      name='20newsgroups')
+
+    if SPOKEN_WORDS:
+        # words done by "say", shapes of their filterbanks
+        #>>> shapes
+        #array([[62, 40],
+        #       [65, 40],
+        #       [58, 40],
+        #       ...,
+        #       [85, 40],
+        #       [79, 40],
+        #       [51, 40]])
+        #>>> shapes.mean(axis=0)
+        #array([ 70.87751196,  40.        ])
+        #>>> shapes.std(axis=0)
+        #array([ 12.94580736,   0.        ])
+        #>>> shapes.min(axis=0)
+        #array([39, 40])
+        words_fbanks = numpy.load("all_words_pascal1k.npz")
+        n_words = len(words_fbanks.keys())
+        all_fbanks = numpy.concatenate([v for _, v in words_fbanks.iteritems()])
+        print all_fbanks.shape
+        mean = all_fbanks.mean(axis=0)
+        print mean.shape
+        std = all_fbanks.std(axis=0)
+        print std.shape
+        X = numpy.zeros((n_words, 40*70), dtype='float32')
+        y = 
+        # take 70 fbanks in the middle of the word and pad with 0s if needed
 

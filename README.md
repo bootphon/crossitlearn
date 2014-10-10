@@ -15,3 +15,12 @@ To train the multi-modal embedding net, do:
 ### Results
 
 TODO: scores && plots
+
+### "Say"-based corpus
+
+(On Mac OS X only)
+Use `bash say_words.sh` with a words.txt file in the same directory. Then you
+can `sox` the produced `*.aif` to `*.wav` files, then transform them to
+filterbanks with `python mfsc.py *.wav` and finally put them in one big `*.npz`
+formatted dictionary with `python npz_fbanks.py FOLDER`.
+
