@@ -50,7 +50,7 @@ class CrossNet(object):
         layer_input_snd = self.snd
 
         for layer_type, n_in, n_out in zip(layers_types[0],
-                self.layers_ins[0], self.layers_outs[0]):
+                self.layers_ins_img, self.layers_outs_img):
             this_layer_img = layer_type(rng=numpy_rng,
                     input=layer_input_img, n_in=n_in, n_out=n_out)
             assert hasattr(this_layer_img, 'output')
@@ -63,7 +63,7 @@ class CrossNet(object):
             self.layers.append(this_layer_img)
 
         for layer_type, n_in, n_out in zip(layers_types[1],
-                self.layers_ins[1], self.layers_outs[1]):
+                self.layers_ins_snd, self.layers_outs_snd):
             this_layer_snd = layer_type(rng=numpy_rng,
                     input=layer_input_snd, n_in=n_in, n_out=n_out)
             assert hasattr(this_layer_snd, 'output')
@@ -157,10 +157,15 @@ class CrossNet(object):
             self.mean_cost_training = self.mean_cost
 
     def __repr__(self):
-        dimensions_layers_str = map(lambda x: "x".join(map(str, x)),
-                zip(self.layers_ins, self.layers_outs))
-        return "_".join(map(lambda x: "_".join((x[0].__name__, x[1])),
-            zip(self.layers_types, dimensions_layers_str)))
+        dimensions_layers_str = (map(lambda x: "x".join(map(str, x)),
+                zip(self.layers_ins_img, self.layers_outs_img)),
+                map(lambda x: "x".join(map(str, x)),
+                zip(self.layers_ins_snd, self.layers_outs_snd)))
+
+        return ", ".join(["_".join(map(lambda x: "_".join((x[0].__name__, x[1])),
+            zip(self.layers_types[0], dimensions_layers_str[0]))),
+            "_".join(map(lambda x: "_".join((x[0].__name__, x[1])),
+            zip(self.layers_types[1], dimensions_layers_str[1])))])
 
     def get_SGD_trainer(self, debug=False):
         """ Returns a plain SGD minibatch trainer with learning rate as param.

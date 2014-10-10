@@ -44,6 +44,7 @@ class CrossLearnIterator(object):
 #        >>> a['Img'][1][0]['fname']
 #        array([[array([u'imgs/2008_003703.jpg'],
 #                  dtype='<U20')]], dtype=object)
+        print >> sys.stderr, "loading img features"
         from scipy.io import loadmat as loadmat
         self.imgs = {}
         m = loadmat(img_mat_path)
@@ -54,23 +55,27 @@ class CrossLearnIterator(object):
             self.imgs[fname.split('/')[-1]] = codes
         joblib.dump(self.imgs, 'imgs.joblib')
 
-        from collections import defaultdict
-        self.snds = defaultdict(lambda: [])
-        self.fbanks = {}
-        STACKS_FOLDER = '/fhgfs/bootphon/scratch/mwv/LUCID/stack_tokens/'
-        for fname in os.listdir(STACKS_FOLDER):
-            if "npy" in fname:
-                self.fbanks[fname.split('.')[-1]] = numpy.load(STACKS_FOLDER + fname)
-        joblib.dump(self.fbanks, 'fbanks.joblib')
+        USE_DUMPED_FBANKS = False  # TODO MAKE THIS False !!!!!
+        self.fbanks = joblib.load('fbanks.joblib')
+        if not USE_DUMPED_FBANKS:
+            print >> sys.stderr, "loading fbanks"
+            self.fbanks = {}
+            STACKS_FOLDER = '/fhgfs/bootphon/scratch/mwv/LUCID/stack_tokens/'
+            for fname in os.listdir(STACKS_FOLDER):
+                if "npy" in fname:
+                    self.fbanks[fname.split('.')[0]] = numpy.load(STACKS_FOLDER + fname)
+            joblib.dump(self.fbanks, 'fbanks.joblib')
 
+        print >> sys.stderr, "loading corpus"
         import pandas
+        self.snds = defaultdict(lambda: [])
         df = pandas.read_pickle(corpus_pkl_path)
-        for i, fname in enumerate(df['filename']):
+        for i, fname in enumerate(df['picture']):
             #self.snds[fname].extend([numpy.load(STACKS_FOLDER + x)
             #    for x in df['tokens'][i][0]])
             self.snds[fname].extend([x for x in df['tokens'][i][0]])
             # TODO TODO TODO df['tokens'][i][j] with j iterating over speakers
-        joblib.dump(self.snds, 'snds.joblib')
+        #joblib.dump(self.snds, 'snds.joblib')
 
     def __iter__(self):
         for img_name, img_feats in self.imgs.iteritems():
@@ -78,22 +83,29 @@ class CrossLearnIterator(object):
             bad_pairs = []
             n_img_features = img_feats.shape[1]
             n_fbanks_features = 0
+            img_name = img_name.split('.')[0]
             for img_feat in img_feats:
+                #print img_feat
                 for fbanksname in self.snds[img_name]:
                     tmpfb = self.fbanks[fbanksname]
                     n_fbanks_features = tmpfb.shape[0]
                     good_pairs.append((img_feat, tmpfb))
                     lkeys = len(self.fbanks.keys())
-                    bad_fbanksname = self.fbanks.keys()[random.randint(lkeys)]
+                    bad_fbanksname = self.fbanks.keys()[random.randint(0, lkeys-1)]
                     while bad_fbanksname in self.snds[img_name]:
-                        bad_fbanksname = self.fbanks.keys()[random.randint(lkeys)]
+                        bad_fbanksname = self.fbanks.keys()[random.randint(0, lkeys-1)]
                     bad_pairs.append((img_feat, self.fbanks[bad_fbanksname]))
             gp = len(good_pairs)
+            if not gp:
+                continue
             bp = len(bad_pairs)
             assert(gp == bp)
             img = numpy.ndarray((gp+bp, n_img_features), dtype='float32')
             snd = numpy.ndarray((gp+bp, n_fbanks_features), dtype='float32')
             y = numpy.ones((gp+bp,), dtype='int32')
+            #print good_pairs
+            #print bad_pairs
+            #print zip(*good_pairs)[0]
             img[::2] = zip(*good_pairs)[0]
             img[1::2] = zip(*bad_pairs)[0]
             snd[::2] = zip(*good_pairs)[1]

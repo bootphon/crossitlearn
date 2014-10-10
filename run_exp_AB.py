@@ -12,7 +12,7 @@ Options:
     -h --help                   Show this screen
     --version                   Show version
     --dataset-path=str          A valid path to the dataset
-    default is timit
+    default is pascal1k
     --batch-size=int            Batch size, used only by the batch iterator
     default is 100
     --init-lr=float             Initial learning rate for SGD
@@ -48,11 +48,10 @@ import joblib
 import random
 from random import shuffle
 
-from prep_timit import load_data
 from dataset_iterators import CrossLearnIterator
 from layers import Linear, ReLU, SigmoidLayer, SoftPlus
 from classifiers import LogisticRegression
-from nnet_archs import NeuralNet, DropoutNet, ABNeuralNet, DropoutABNeuralNet
+from nnet_archs import CrossNet, DropoutCrossNet
 
 DEFAULT_DATASET = '/fhgfs/bootphon/scratch/gsynnaeve/learning_semantics2014/pascal1k_prepared'
 DEBUG = False
@@ -145,6 +144,8 @@ def run(dataset_path=DEFAULT_DATASET, dataset_name='pascal1k',
 
     train_set_iterator = iterator_type(dataset_path + '/split_train_img.mat',
             dataset_path + '/corpus.pkl', batch_size=batch_size)
+    #train_set_iterator = iterator_type(dataset_path + '/split_val_img.mat',
+    #        dataset_path + '/corpus.pkl', batch_size=batch_size)
     valid_set_iterator = iterator_type(dataset_path + '/split_val_img.mat',
             dataset_path + '/corpus.pkl', batch_size=batch_size)
     test_set_iterator = iterator_type(dataset_path + '/split_test_img.mat',
@@ -332,7 +333,7 @@ if __name__=='__main__':
     dataset_path=DEFAULT_DATASET
     if arguments['--dataset-path'] != None:
         dataset_path = arguments['--dataset-path']
-    dataset_name = 'timit'
+    dataset_name = 'pascal1k'
     if arguments['--dataset-name'] != None:
         dataset_name = arguments['--dataset-name']
     batch_size = 100
