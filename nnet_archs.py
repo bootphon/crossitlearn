@@ -52,7 +52,8 @@ class CrossNet(object):
         for layer_type, n_in, n_out in zip(layers_types[0],
                 self.layers_ins_img, self.layers_outs_img):
             this_layer_img = layer_type(rng=numpy_rng,
-                    input=layer_input_img, n_in=n_in, n_out=n_out)
+                    #input=layer_input_img, n_in=n_in, n_out=n_out)
+                    input=layer_input_img, n_in=n_in, n_out=n_out, cap=6.)
             assert hasattr(this_layer_img, 'output')
             layer_input_img = this_layer_img.output
             self.params.extend(this_layer_img.params)
@@ -65,7 +66,8 @@ class CrossNet(object):
         for layer_type, n_in, n_out in zip(layers_types[1],
                 self.layers_ins_snd, self.layers_outs_snd):
             this_layer_snd = layer_type(rng=numpy_rng,
-                    input=layer_input_snd, n_in=n_in, n_out=n_out)
+                    #input=layer_input_snd, n_in=n_in, n_out=n_out)
+                    input=layer_input_snd, n_in=n_in, n_out=n_out, cap=6.)
             assert hasattr(this_layer_snd, 'output')
             layer_input_snd = this_layer_snd.output
             self.params.extend(this_layer_snd.params)
@@ -125,6 +127,9 @@ class CrossNet(object):
         self.hellinger_cost = T.switch(self.y, self.hellinger, 1.-self.hellinger)
         self.mean_hellinger_cost = T.mean(self.hellinger_cost)
         self.sum_hellinger_cost = T.sum(self.hellinger_cost)
+
+        self.layer_output_img = layer_input_img
+        self.layer_output_snd = layer_input_snd
 
         if loss == 'cos_cos2':
             self.cost = self.sum_cos_cos2_sim_cost
@@ -242,7 +247,7 @@ class CrossNet(object):
         batch_y = T.ivector('batch_y')
         score = theano.function(inputs=[theano.Param(batch_img), 
             theano.Param(batch_snd), theano.Param(batch_y)],
-                outputs=self.cost,
+                outputs=self.mean_cost,
                 givens={self.img: batch_img, self.snd: batch_snd, self.y: batch_y})
 
         # Create a function that scans the entire set given as input
@@ -272,15 +277,22 @@ class CrossNet(object):
         batch_snd = T.fmatrix('batch_snd')
         transform = theano.function(inputs=[theano.Param(batch_img), 
             theano.Param(batch_snd)],
-                outputs=[self.layers[-2].output, self.layers[-1].output],
+                outputs=[self.layer_output_img, self.layer_output_snd],
                 givens={self.img: batch_img, self.snd: batch_snd})
         return transform
 
     def transform_img(self):
         batch_img = T.fmatrix('batch_img')
         transform = theano.function(inputs=[theano.Param(batch_img)],
-                outputs=self.layers[-2].output,
+                outputs=self.layer_input_img,
                 givens={self.img: batch_img})
+        return transform
+
+    def transform_snd(self):
+        batch_snd = T.fmatrix('batch_snd')
+        transform = theano.function(inputs=[theano.Param(batch_snd)],
+                outputs=self.layer_input_snd,
+                givens={self.snd: batch_snd})
         return transform
 
 
