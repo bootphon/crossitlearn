@@ -10,7 +10,9 @@ TODO: one line on the code to transform LUCID into our dataset.
 TODO: one line on the code to extract R-CNN features from images.
 
 To train the multi-modal embedding net, do:  
-        python train_net.py --dataset-path=pascal1k.joblib
+```
+THEANO_FLAGS="device=gpu1" python run_exp_AB.py --dataset-path=/fhgfs/bootphon/scratch/gsynnaeve/learning_semantics2014/pascal_full/ --prefix-output-fname="maxnorm" --debug-print=1 --debug-time
+```
 
 ### Results
 
