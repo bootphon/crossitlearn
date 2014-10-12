@@ -52,8 +52,8 @@ class CrossNet(object):
         for layer_type, n_in, n_out in zip(layers_types[0],
                 self.layers_ins_img, self.layers_outs_img):
             this_layer_img = layer_type(rng=numpy_rng,
-                    #input=layer_input_img, n_in=n_in, n_out=n_out)
-                    input=layer_input_img, n_in=n_in, n_out=n_out, cap=6.)
+                    input=layer_input_img, n_in=n_in, n_out=n_out)
+                    #input=layer_input_img, n_in=n_in, n_out=n_out, cap=6.)
             assert hasattr(this_layer_img, 'output')
             layer_input_img = this_layer_img.output
             self.params.extend(this_layer_img.params)
@@ -66,8 +66,8 @@ class CrossNet(object):
         for layer_type, n_in, n_out in zip(layers_types[1],
                 self.layers_ins_snd, self.layers_outs_snd):
             this_layer_snd = layer_type(rng=numpy_rng,
-                    #input=layer_input_snd, n_in=n_in, n_out=n_out)
-                    input=layer_input_snd, n_in=n_in, n_out=n_out, cap=6.)
+                    input=layer_input_snd, n_in=n_in, n_out=n_out)
+                    #input=layer_input_snd, n_in=n_in, n_out=n_out, cap=6.)
             assert hasattr(this_layer_snd, 'output')
             layer_input_snd = this_layer_snd.output
             self.params.extend(this_layer_snd.params)
