@@ -22,6 +22,8 @@ class CrossNet(object):
             n_outs=200,
             loss='cos_cos2',
             rho=0.95, eps=1.E-6,
+            l1_reg=0.,
+            l2_reg=0.,
             max_norm=0.,
             debugprint=False):
         self.layers = []
@@ -152,6 +154,13 @@ class CrossNet(object):
         else:
             print >> sys.stderr, "NO COST FUNCTION"
             sys.exit(-1)
+
+        if l1_reg:
+            self.cost = self.cost + l1_reg*L1
+            self.mean_cost = self.mean_cost + l1_reg*L1
+        if l2_reg:
+            self.cost = self.cost + l2_reg*L2
+            self.mean_cost = self.mean_cost + l2_reg*L2
 
         if debugprint:
             theano.printing.debugprint(self.cost)
@@ -284,14 +293,14 @@ class CrossNet(object):
     def transform_img(self):
         batch_img = T.fmatrix('batch_img')
         transform = theano.function(inputs=[theano.Param(batch_img)],
-                outputs=self.layer_input_img,
+                outputs=self.layer_output_img,
                 givens={self.img: batch_img})
         return transform
 
     def transform_snd(self):
         batch_snd = T.fmatrix('batch_snd')
         transform = theano.function(inputs=[theano.Param(batch_snd)],
-                outputs=self.layer_input_snd,
+                outputs=self.layer_output_snd,
                 givens={self.snd: batch_snd})
         return transform
 

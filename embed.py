@@ -13,18 +13,28 @@ transform_both = nnet.transform_img_snd()
 
 # TODO if needed, normalize data if it was not
 
-for batch_of_img in images_features:
+#for batch_of_img in images_features:
     # batch_of_img has to be a (n_images, 4096) ndarray of float32
     # look at dataset_iterators.py:47-56 to get the images features
-    embedded_images = transform_imgs(batch_of_img)
+#    embedded_images = transform_imgs(batch_of_img)
 
-for batch_of_snd in words_features:
+#for batch_of_snd in words_features:
     # batch_of_snd has to be a (n_words, 40*71) ndarray of float32
     # look at dataset_iterators.py:61-67 to get the speech features
-    embedded_words = transform_snds(batch_of_snd)
+#    embedded_words = transform_snds(batch_of_snd)
 
 # TODO note: you could even reuse from dataset_iterators import CrossLearnIterator
 
-for batch_of_img, batch_of_snd in zip(images_features, words_features):
-    embedded_images, embedded_words = transform_both(batch_of_img,
-            batch_of_snd)
+from dataset_iterators import CrossLearnIterator
+dataset_path = "/fhgfs/bootphon/scratch/gsynnaeve/learning_semantics2014/pascal_full/"
+test_set_iterator = CrossLearnIterator(dataset_path + '/split_test_img.mat',
+        dataset_path + '/corpus.pkl')
+#for batch_of_img, batch_of_snd in zip(images_features, words_features):
+#    embedded_images, embedded_words = transform_both(batch_of_img,
+#            batch_of_snd)
+for img, snd, y in test_set_iterator:
+    img = img[y == 1]
+    snd = snd[y == 1]
+    embedded_images, embedded_words = transform_both(img, snd)
+    print embedded_images[0]
+    print embedded_words[0]

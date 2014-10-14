@@ -188,6 +188,7 @@ def run(dataset_path=DEFAULT_DATASET, dataset_name='pascal1k',
                 loss='cos_cos2',
                 rho=0.95,
                 eps=1.E-6,
+                #l2_reg=0.0001,
                 max_norm=4.,
                 debugprint=debug_print)
     print "Created a neural net as:",

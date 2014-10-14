@@ -55,7 +55,7 @@ class CrossLearnIterator(object):
             self.imgs[fname.split('/')[-1]] = codes
         joblib.dump(self.imgs, 'imgs.joblib')
 
-        USE_DUMPED_FBANKS = False  # TODO MAKE THIS False !!!!!
+        USE_DUMPED_FBANKS = False  # TODO MAKE THIS True FOR SPEED!!!
         self.fbanks = joblib.load('fbanks.joblib')
         if not USE_DUMPED_FBANKS:
             print >> sys.stderr, "loading fbanks"
