@@ -215,7 +215,7 @@ def run(dataset_path=DEFAULT_DATASET, dataset_name='pascal1k',
 
     train_scoref = nnet.score_classif_same_diff_separated(train_set_iterator)
     valid_scoref = nnet.score_classif_same_diff_separated(valid_set_iterator)
-    test_scoref = nnet.score_classif(test_set_iterator)
+    test_scoref = nnet.score_classif_same_diff_separated(test_set_iterator)
     data_iterator = train_set_iterator
 
     if debug_on_test_only:
