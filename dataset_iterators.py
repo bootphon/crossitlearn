@@ -56,7 +56,6 @@ class CrossLearnIterator(object):
         joblib.dump(self.imgs, 'imgs.joblib')
 
         USE_DUMPED_FBANKS = False  # TODO MAKE THIS True FOR SPEED!!!
-        self.fbanks = joblib.load('fbanks.joblib')
         if not USE_DUMPED_FBANKS:
             print >> sys.stderr, "loading fbanks"
             self.fbanks = {}
@@ -65,6 +64,8 @@ class CrossLearnIterator(object):
                 if "npy" in fname:
                     self.fbanks[fname.split('.')[0]] = numpy.load(STACKS_FOLDER + fname)
             joblib.dump(self.fbanks, 'fbanks.joblib')
+        else:
+            self.fbanks = joblib.load('fbanks.joblib')
 
         print >> sys.stderr, "loading corpus"
         import pandas
