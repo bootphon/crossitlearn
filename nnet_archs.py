@@ -286,7 +286,9 @@ class CrossNet(object):
         batch_snd = T.fmatrix('batch_snd')
         transform = theano.function(inputs=[theano.Param(batch_img), 
             theano.Param(batch_snd)],
-                outputs=[self.layer_output_img, self.layer_output_snd],
+                #outputs=[self.layer_output_img, self.layer_output_snd],
+                outputs=[self.layers[len(self.layers_outs_img) - 1].output,
+                    self.layers[len(self.layers_outs_img) + len(self.layers_outs_snd) - 1].output],
                 givens={self.img: batch_img, self.snd: batch_snd})
         return transform
 
