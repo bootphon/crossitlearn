@@ -306,7 +306,7 @@ def load_net(nnet_file):
 
 if __name__ == '__main__':
     datadir = '/mnt/data/pascal1k_prepared_dataset/'
-    stackdir = path.join(LUCID_stack_tokens_drop)
+    stackdir = path.join(datadir, 'LUCID_stack_tokens_drop')
     # if len(sys.argv) != 6:
     #     print 'usage: embed_eval.py NNET_FILE CORPUS_FILE TOKEN_FILE STACKTOKENSDIR REPLACEMENTFILE'
     #     exit()
@@ -339,7 +339,7 @@ if __name__ == '__main__':
     print 'done.'
 
     print 'loading images...',
-    img_mat_fname = '/mnt/data/pascal1k_prepared_dataset/split_test_img.mat')
+    img_mat_fname = '/mnt/data/pascal1k_prepared_dataset/split_test_img.mat'
     img_fnames, img_X = load_images(img_mat_fname, corpus_df, force_rebuild=True)
     pic2ix = {v:k for k, v in enumerate(img_fnames)}
     print 'done.'

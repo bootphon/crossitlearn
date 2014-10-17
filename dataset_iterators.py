@@ -59,7 +59,7 @@ class CrossLearnIterator(object):
         if not USE_DUMPED_FBANKS:
             print >> sys.stderr, "loading fbanks"
             self.fbanks = {}
-            STACKS_FOLDER = '/fhgfs/bootphon/scratch/mwv/LUCID/stack_tokens/'
+            STACKS_FOLDER = '/'.join(corpus_pkl_path.split('/')[:-1]) + '/LUCID_stack_tokens_drop/'
             for fname in os.listdir(STACKS_FOLDER):
                 if "npy" in fname:
                     self.fbanks[fname.split('.')[0]] = numpy.load(STACKS_FOLDER + fname)

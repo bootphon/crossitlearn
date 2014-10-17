@@ -143,13 +143,13 @@ def run(dataset_path=DEFAULT_DATASET, dataset_name='pascal1k',
     print "output file name:", output_file_name
 
     train_set_iterator = iterator_type(dataset_path + '/split_train_img.mat',
-            dataset_path + '/corpus.pkl', batch_size=batch_size)
+            dataset_path + '/corpus_drop.pkl', batch_size=batch_size)
     #train_set_iterator = iterator_type(dataset_path + '/split_val_img.mat',
     #        dataset_path + '/corpus.pkl', batch_size=batch_size)
     valid_set_iterator = iterator_type(dataset_path + '/split_val_img.mat',
-            dataset_path + '/corpus.pkl', batch_size=batch_size)
+            dataset_path + '/corpus_drop.pkl', batch_size=batch_size)
     test_set_iterator = iterator_type(dataset_path + '/split_test_img.mat',
-            dataset_path + '/corpus.pkl', batch_size=batch_size)
+            dataset_path + '/corpus_drop.pkl', batch_size=batch_size)
 
     n_ins = (4096, 40*71)  # TODO un-hardcode
     n_outs = DIM_EMBEDDING # TODO un-constant
@@ -189,7 +189,7 @@ def run(dataset_path=DEFAULT_DATASET, dataset_name='pascal1k',
                 rho=0.95,
                 eps=1.E-6,
                 #l2_reg=0.0001,
-                max_norm=4.,
+                max_norm=6.,
                 debugprint=debug_print)
     print "Created a neural net as:",
     print str(nnet)
@@ -372,6 +372,8 @@ if __name__=='__main__':
         iterator_type=CrossLearnIterator, batch_size=batch_size,
         init_lr=init_lr, max_epochs=max_epochs, 
         network_type=network_type, trainer_type=trainer_type,
+        #layers_types=([ReLU], [ReLU, ReLU, ReLU]),
+        #layers_sizes=([], [1024, 1024]),
         layers_types=([ReLU], [ReLU, ReLU, ReLU, ReLU]),
         layers_sizes=([], [1024, 1024, 1024]),
         dropout_rates=([0.2], [0.2, 0.5, 0.5, 0.5]),
