@@ -20,7 +20,7 @@ import pandas as pd
 from nnet_archs import CrossNet
 from dataset_iterators import CrossLearnIterator
 
-CACHE_DIR = '/fhgfs/bootphon/scratch/mwv/speech2image/cache/'
+CACHE_DIR = os.getcwd()
 # try:
 #     os.makedirs(CACHE_DIR)
 # except OSError:
