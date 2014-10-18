@@ -54,8 +54,8 @@ class CrossNet(object):
         for layer_type, n_in, n_out in zip(layers_types[0],
                 self.layers_ins_img, self.layers_outs_img):
             this_layer_img = layer_type(rng=numpy_rng,
-                    input=layer_input_img, n_in=n_in, n_out=n_out)
-                    #input=layer_input_img, n_in=n_in, n_out=n_out, cap=6.)
+                    #input=layer_input_img, n_in=n_in, n_out=n_out)
+                    input=layer_input_img, n_in=n_in, n_out=n_out, cap=6.)
             assert hasattr(this_layer_img, 'output')
             layer_input_img = this_layer_img.output
             self.params.extend(this_layer_img.params)
@@ -68,8 +68,8 @@ class CrossNet(object):
         for layer_type, n_in, n_out in zip(layers_types[1],
                 self.layers_ins_snd, self.layers_outs_snd):
             this_layer_snd = layer_type(rng=numpy_rng,
-                    input=layer_input_snd, n_in=n_in, n_out=n_out)
-                    #input=layer_input_snd, n_in=n_in, n_out=n_out, cap=6.)
+                    #input=layer_input_snd, n_in=n_in, n_out=n_out)
+                    input=layer_input_snd, n_in=n_in, n_out=n_out, cap=6.)
             assert hasattr(this_layer_snd, 'output')
             layer_input_snd = this_layer_snd.output
             self.params.extend(this_layer_snd.params)
@@ -99,8 +99,9 @@ class CrossNet(object):
         self.mean_rmse_costs = T.mean(self.rmse_cost)
         self.mean_rsse_costs = T.mean(self.rsse_cost)
 
-        #self.cos_sim = (T.batched_dot(layer_input_img, layer_input_snd) /
-        self.cos_sim = (T.sum(layer_input_img * layer_input_snd, axis=-1) /
+	self.dot_prod = T.sum(layer_input_img * layer_input_snd, axis=-1)
+        #self.cos_sim = (T.batched_dot(layer_input_img, layer_input_snd) / 
+        self.cos_sim = (self.dot_prod /
             (layer_input_img.norm(2, axis=-1) * layer_input_snd.norm(2, axis=-1)))
         self.cos_sim_cost = T.switch(self.y, 1.-self.cos_sim, self.cos_sim)
         self.mean_cos_sim_cost = T.mean(self.cos_sim_cost)
@@ -114,6 +115,10 @@ class CrossNet(object):
         self.cos_cos2_sim_cost = T.switch(self.y, (1.-self.cos_sim)/2, self.cos_sim ** 2)
         self.mean_cos_cos2_sim_cost = T.mean(self.cos_cos2_sim_cost)
         self.sum_cos_cos2_sim_cost = T.sum(self.cos_cos2_sim_cost)
+
+        self.margin_dot_cost = T.switch(self.y, 1.-self.dot_prod, 1.+self.dot_prod)
+	self.mean_margin_dot_cost = T.mean(self.margin_dot_cost)
+	self.sum_margin_dot_cost = T.sum(self.margin_dot_cost)
 
         self.euclidean = (layer_input_img - layer_input_snd).norm(2, axis=-1)
         self.euclidean_cost = T.switch(self.y, self.euclidean, -self.euclidean)
@@ -142,6 +147,9 @@ class CrossNet(object):
         elif loss == 'cos2':
             self.cost = self.sum_cos2_sim_cost
             self.mean_cost = self.mean_cos_sim_cost
+        elif loss == 'margin_dot':
+	    self.cost = self.sum_margin_dot_cost
+            self.mean_cost = self.mean_margin_dot_cost
         elif loss == 'euclidean':
             self.cost = self.sum_euclidean_cost
             self.mean_cost = self.mean_euclidean_cost
