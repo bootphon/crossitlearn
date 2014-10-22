@@ -11,10 +11,12 @@ with open(sys.argv[1], 'rb') as f:
 transform_imgs = nnet.transform_img()
 transform_snds = nnet.transform_snd()
 
-dataset_path = "/fhgfs/bootphon/scratch/gsynnaeve/learning_semantics2014/pascal_full/"
+#dataset_path = "/fhgfs/bootphon/scratch/gsynnaeve/learning_semantics2014/pascal_full/"
+dataset_path = "/mnt/data/pascal1k_prepared_dataset/"
 corpus_pkl = "corpus_drop.pkl"
 lucid_folder = "LUCID_stack_tokens_drop"
-test_images = "split_test_img.mat"
+#test_images = "split_test_img.mat"
+test_images = "split_train_img.mat"
 
 from scipy.io import loadmat as loadmat
 imgs_emb = {}  # image_name: [20 embeddings]
@@ -40,7 +42,10 @@ for i, img_name in enumerate(df['picture']):
             for token in tokens_list_by_same_speaker:
                 if token not in tokens_emb:
                     tmp = np.asarray(np.load(lucid_path + token + '.npy'), dtype='float32')
-                    tokens_emb[token] = transform_snds(np.reshape(tmp, (1, tmp.shape[0])))
+	            tmp2 = transform_snds(np.reshape(tmp, (1, tmp.shape[0])))
+                    tokens_emb[token] = tmp2
+	            with open("tokens_embs/"+token+".npy", 'wb') as wf:
+		        np.save(wf, tmp2)
 
 with open("imgs_tokens_gold_triplet.pkl", 'wb') as wf:
     cPickle.dump((imgs_emb, tokens_emb, imgs_tokens_gold), wf, -1)

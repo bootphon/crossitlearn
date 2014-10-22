@@ -116,7 +116,9 @@ class CrossNet(object):
         self.mean_cos_cos2_sim_cost = T.mean(self.cos_cos2_sim_cost)
         self.sum_cos_cos2_sim_cost = T.sum(self.cos_cos2_sim_cost)
 
-        self.margin_dot_cost = T.switch(self.y, 1.-self.dot_prod, 1.+self.dot_prod)
+        from layers import relu_f
+        #self.margin_dot_cost = relu_f(T.switch(self.y, 1.-self.dot_prod, -1.+self.dot_prod))
+        self.margin_dot_cost = T.switch(self.y, 1.-self.dot_prod, -1.+self.dot_prod)
 	self.mean_margin_dot_cost = T.mean(self.margin_dot_cost)
 	self.sum_margin_dot_cost = T.sum(self.margin_dot_cost)
 
@@ -277,8 +279,10 @@ class CrossNet(object):
         batch_img = T.fmatrix('batch_img')
         batch_snd = T.fmatrix('batch_snd')
         batch_y = T.ivector('batch_y')
-        cost_same = T.mean(self.cos_sim[T.eq(self.y, 1).nonzero()], axis=-1)
-        cost_diff = T.mean(self.cos_sim[T.eq(self.y, 0).nonzero()], axis=-1)
+        #cost_same = T.mean(self.cos_sim[T.eq(self.y, 1).nonzero()], axis=-1)
+        #cost_diff = T.mean(self.cos_sim[T.eq(self.y, 0).nonzero()], axis=-1)
+        cost_same = T.mean(self.dot_prod[T.eq(self.y, 1).nonzero()], axis=-1)
+        cost_diff = T.mean(self.dot_prod[T.eq(self.y, 0).nonzero()], axis=-1)
         score = theano.function(inputs=[theano.Param(batch_img), 
             theano.Param(batch_snd), theano.Param(batch_y)],
                 outputs=[cost_same, cost_diff],

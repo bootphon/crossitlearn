@@ -311,7 +311,7 @@ if __name__ == '__main__':
     #     print 'usage: embed_eval.py NNET_FILE CORPUS_FILE TOKEN_FILE STACKTOKENSDIR REPLACEMENTFILE'
     #     exit()
     print 'loading net...',
-    nnet_file = 'full_pascal1k_crossnet_adadelta_emb_200.pickle'
+    nnet_file = 'L2_small_full_pascal1k_crossnet_adadelta_emb_200.pickle'
     nnet = load_net(nnet_file)
 
     transform_imgs = nnet.transform_img()
